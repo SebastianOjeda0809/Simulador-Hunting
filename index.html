@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulador · Compensación Variable Hunting</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --orange: #FF5B15;
+    --orange-lt: #FFF0EA;
+    --orange-mid: #FFD4BE;
+    --teal: #0F6E56;
+    --teal-lt: #E1F5EE;
+    --teal-mid: #9FE1CB;
+    --purple: #534AB7;
+    --purple-lt: #EEEDFE;
+    --purple-mid: #CECBF6;
+    --red-lt: #FCEBEB;
+    --red-mid: #F7C1C1;
+    --red: #A32D2D;
+    --dark: #111110;
+    --mid: #3d3d3a;
+    --muted: #888780;
+    --border: #e8e6e0;
+    --bg: #f5f4f0;
+    --white: #ffffff;
+    --gray-lt: #F1EFE8;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    min-height: 100vh;
+    padding: 32px 16px 64px;
+    color: var(--dark);
+  }
+
+  .page { max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+  /* HEADER */
+  .header {
+    background: var(--dark);
+    border-radius: 16px;
+    padding: 32px 36px;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 280px; height: 280px;
+    border-radius: 50%;
+    background: var(--orange);
+    opacity: .06;
+  }
+  .header-eyebrow {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--orange);
+    margin-bottom: 10px;
+  }
+  .header-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .header-title span { color: var(--orange); }
+  .header-sub { font-size: 13px; color: #888780; line-height: 1.5; }
+
+  /* CARDS */
+  .card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .card-head {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .card-title { font-size: 14px; font-weight: 500; color: var(--dark); }
+  .badge {
+    font-size: 10px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .badge-orange { background: var(--orange-lt); color: #993c1d; }
+  .badge-teal   { background: var(--teal-lt);   color: var(--teal); }
+  .badge-purple { background: var(--purple-lt);  color: var(--purple); }
+  .card-body { padding: 24px; }
+
+  /* REGLA VISUAL */
+  .rule-flow {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    margin-bottom: 16px;
+  }
+  .rule-step { padding: 14px 16px; border-right: 1px solid var(--border); }
+  .rule-step:last-child { border-right: none; }
+  .rule-step.cond  { background: var(--orange-lt); }
+  .rule-step.yes   { background: var(--teal-lt); }
+  .rule-step.no    { background: var(--red-lt); }
+  .rule-tag {
+    font-size: 9px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    margin-bottom: 5px;
+  }
+  .rule-tag.orange { color: #993c1d; }
+  .rule-tag.teal   { color: var(--teal); }
+  .rule-tag.red    { color: var(--red); }
+  .rule-main { font-size: 12px; font-weight: 500; line-height: 1.4; }
+  .rule-main.orange { color: #712b13; }
+  .rule-main.teal   { color: #085041; }
+  .rule-main.red    { color: var(--red); }
+  .rule-sub { font-size: 10.5px; color: var(--muted); line-height: 1.4; margin-top: 4px; }
+
+  .insight {
+    background: var(--purple-lt);
+    border-left: 3px solid var(--purple);
+    border-radius: 0 10px 10px 0;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #26215c;
+    line-height: 1.6;
+  }
+  .insight strong { font-weight: 500; }
+
+  /* TOGGLE */
+  .toggle-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--gray-lt);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .toggle-info { flex: 1; }
+  .toggle-label { font-size: 13px; font-weight: 500; color: var(--dark); }
+  .toggle-sub-text { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .toggle-track {
+    width: 42px; height: 24px;
+    border-radius: 12px;
+    background: #d3d1c7;
+    position: relative;
+    flex-shrink: 0;
+    transition: background .25s;
+  }
+  .toggle-track.on { background: var(--teal); }
+  .toggle-knob {
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: white;
+    transition: transform .25s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  }
+  .toggle-track.on .toggle-knob { transform: translateX(18px); }
+
+  /* SLIDERS */
+  .sliders { display: flex; flex-direction: column; gap: 14px; margin-bottom: 24px; }
+  .slider-row { display: flex; align-items: center; gap: 14px; }
+  .slider-meta { min-width: 180px; }
+  .slider-tag {
+    display: inline-flex;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 20px;
+    margin-bottom: 4px;
+  }
+  .slider-tag.early { background: var(--orange-lt); color: #993c1d; }
+  .slider-tag.early.locked { background: var(--red-lt); color: var(--red); text-decoration: line-through; opacity: .7; }
+  .slider-tag.late  { background: var(--teal-lt);   color: var(--teal); }
+  .slider-count { font-size: 15px; font-weight: 500; color: var(--dark); }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--border);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--orange);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    transition: transform .1s;
+  }
+  input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+  input[type=range]::-moz-range-thumb {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--orange);
+    border: none;
+    cursor: pointer;
+  }
+  .slider-val {
+    font-size: 16px;
+    font-weight: 500;
+    min-width: 28px;
+    text-align: right;
+    color: var(--dark);
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* RESULTADOS */
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .metric {
+    background: var(--gray-lt);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .metric-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .metric-val { font-size: 24px; font-weight: 500; line-height: 1; }
+  .metric-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* PROGRESS */
+  .progress-wrap { margin-bottom: 16px; }
+  .progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .progress-bar {
+    height: 12px;
+    border-radius: 6px;
+    background: var(--border);
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 6px;
+    transition: width .4s cubic-bezier(.4,0,.2,1), background .3s;
+  }
+  .progress-markers {
+    position: relative;
+    height: 16px;
+    margin-top: 4px;
+  }
+  .progress-marker {
+    position: absolute;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  /* TIERS */
+  .tier-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .tier-pill {
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    background: var(--gray-lt);
+    transition: all .2s;
+  }
+  .tier-pill.active-teal   { background: var(--teal-lt);   color: var(--teal);   border-color: var(--teal-mid); font-weight: 500; }
+  .tier-pill.active-orange { background: var(--orange-lt); color: #993c1d; border-color: var(--orange-mid); font-weight: 500; }
+  .tier-pill.active-purple { background: var(--purple-lt); color: var(--purple); border-color: var(--purple-mid); font-weight: 500; }
+  .tier-pill.active-red    { background: var(--red-lt);    color: var(--red);    border-color: var(--red-mid); font-weight: 500; }
+
+  /* COMPARE */
+  .compare-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .compare-box {
+    border-radius: 12px;
+    padding: 16px 18px;
+    border: 1px solid var(--border);
+    transition: all .3s;
+  }
+  .compare-box.highlight-teal { border-color: var(--teal-mid); background: var(--teal-lt); }
+  .compare-box.highlight-red  { border-color: var(--red-mid);  background: var(--red-lt); }
+  .compare-title { font-size: 11px; font-weight: 500; margin-bottom: 8px; }
+  .compare-num { font-size: 28px; font-weight: 500; line-height: 1; }
+  .compare-sub { font-size: 11px; margin-top: 4px; }
+
+  /* LOCK BANNER */
+  .lock-banner {
+    background: var(--red-lt);
+    border: 1px solid var(--red-mid);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--red);
+    line-height: 1.6;
+    margin-bottom: 20px;
+    display: none;
+  }
+  .lock-banner.show { display: block; }
+  .lock-banner strong { font-weight: 500; }
+
+  /* ESCENARIOS */
+  .scenarios { display: flex; flex-direction: column; gap: 10px; }
+  .scenario-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 80px 80px;
+    gap: 8px;
+    align-items: center;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .scenario-row:hover { border-color: var(--orange); }
+  .scenario-row.selected { border-color: var(--orange); background: var(--orange-lt); }
+  .scenario-name { font-size: 12px; font-weight: 500; color: var(--dark); }
+  .scenario-sub  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .scenario-val  { font-size: 12px; text-align: center; color: var(--mid); }
+  .scenario-pct  { font-size: 13px; font-weight: 500; text-align: center; }
+
+  .scenarios-header {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 80px 80px;
+    gap: 8px;
+    padding: 0 16px 6px;
+  }
+  .scenarios-header span { font-size: 10px; color: var(--muted); text-align: center; font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+  .scenarios-header span:first-child { text-align: left; }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    padding-top: 8px;
+  }
+  .footer strong { color: var(--dark); font-weight: 500; }
+
+  @media (max-width: 600px) {
+    .rule-flow { grid-template-columns: 1fr; }
+    .rule-step { border-right: none; border-bottom: 1px solid var(--border); }
+    .result-grid { grid-template-columns: 1fr 1fr; }
+    .compare-row { grid-template-columns: 1fr; }
+    .slider-meta { min-width: 140px; }
+    .scenario-row { grid-template-columns: 1fr 60px 60px; }
+    .scenarios-header { grid-template-columns: 1fr 60px 60px; }
+    .scenario-row .s-hide { display: none; }
+    .scenarios-header .s-hide { display: none; }
+    .header-title { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-eyebrow">Rappi · Hunting · Compensación variable</div>
+    <div class="header-title">Simulador de<br><span>pago variable</span></div>
+    <div class="header-sub">Modelo con multiplicador por cierre temprano · Condición de acceso por cumplimiento del mes anterior</div>
+  </div>
+
+  <!-- REGLA -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Regla del modelo</span>
+      <span class="badge badge-orange">Propuesta</span>
+    </div>
+    <div class="card-body">
+      <div class="rule-flow">
+        <div class="rule-step cond">
+          <div class="rule-tag orange">Condición de acceso</div>
+          <div class="rule-main orange">Mes anterior ≥ 90%</div>
+          <div class="rule-sub">Debe cumplirse antes de que inicie el mes en curso</div>
+        </div>
+        <div class="rule-step yes">
+          <div class="rule-tag teal">Si cumple</div>
+          <div class="rule-main teal">Sem. 1–2 aplica ×1.25</div>
+          <div class="rule-sub">Cada tienda temprana cuenta como 1.25 hacia la meta</div>
+        </div>
+        <div class="rule-step no">
+          <div class="rule-tag red">Si no cumple</div>
+          <div class="rule-main red">Todo el mes ×1.0</div>
+          <div class="rule-sub">Se recupera al volver a cumplir ≥ 90% el mes siguiente</div>
+        </div>
+      </div>
+      <div class="insight">
+        <strong>La lógica financiera:</strong> una tienda activada en semana 1 genera GMV durante 3+ semanas del mes. En semana 4, genera 0. El multiplicador refleja ese valor real para la empresa. Y el candado del 90% elimina el incentivo de guardar tiendas para el mes siguiente.
+      </div>
+    </div>
+  </div>
+
+  <!-- SIMULADOR -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Simulador · Meta mensual: <strong id="label-meta">20 tiendas</strong></span>
+      <span class="badge badge-purple">Interactivo</span>
+    </div>
+    <div class="card-body">
+
+      <div class="toggle-wrap" onclick="toggleCond()">
+        <div class="toggle-info">
+          <div class="toggle-label">¿Cumplió ≥ 90% el mes anterior?</div>
+          <div class="toggle-sub-text" id="toggle-sub">Sí — multiplicador activo para semanas 1–2</div>
+        </div>
+        <div class="toggle-track on" id="toggle">
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <div class="lock-banner" id="lock-banner">
+        <strong>Multiplicador bloqueado.</strong> Este hunter no llegó al 90% el mes pasado. Las tiendas de semanas 1–2 cuentan ×1.0. Puede desbloquear el beneficio volviendo a cumplir ≥ 90% este mes.
+      </div>
+
+      <div class="sliders">
+        <div class="slider-row">
+          <div class="slider-meta">
+            <div class="slider-tag early" id="early-tag">Sem. 1–2 · ×1.25</div>
+            <div class="slider-count"><span id="v-early">8</span> tiendas</div>
+          </div>
+          <input type="range" min="0" max="30" step="1" value="8" id="sl-early" oninput="calc()">
+          <div class="slider-val" id="sv-early">8</div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-meta">
+            <div class="slider-tag late">Sem. 3–4 · ×1.0</div>
+            <div class="slider-count"><span id="v-late">7</span> tiendas</div>
+          </div>
+          <input type="range" min="0" max="30" step="1" value="7" id="sl-late" oninput="calc()">
+          <div class="slider-val" id="sv-late">7</div>
+        </div>
+        <div class="slider-row">
+          <div class="slider-meta">
+            <div class="slider-tag late">Meta mensual</div>
+            <div class="slider-count"><span id="v-meta">20</span> tiendas</div>
+          </div>
+          <input type="range" min="10" max="40" step="1" value="20" id="sl-meta" oninput="calc()">
+          <div class="slider-val" id="sv-meta">20</div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="result-grid">
+        <div class="metric">
+          <div class="metric-label">Tiendas reales</div>
+          <div class="metric-val" id="r-real">15</div>
+          <div class="metric-sub">cerradas en el mes</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Tiendas acreditadas</div>
+          <div class="metric-val" id="r-credit" style="color:var(--orange)">17</div>
+          <div class="metric-sub" id="r-credit-sub">con multiplicador ×1.25</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">% de meta</div>
+          <div class="metric-val" id="r-pct">85%</div>
+          <div class="metric-sub" id="r-tier-desc">Tier 80%</div>
+        </div>
+      </div>
+
+      <div class="progress-wrap">
+        <div class="progress-labels">
+          <span>0%</span><span>80%</span><span>90%</span><span>100%</span><span>110%+</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill" style="width:85%;background:var(--orange)"></div>
+        </div>
+      </div>
+
+      <div class="tier-pills">
+        <div class="tier-pill" id="tp-0">Bajo 80% · sin variable</div>
+        <div class="tier-pill active-orange" id="tp-80">80% · 80% del variable</div>
+        <div class="tier-pill" id="tp-90">90% · 90% del variable</div>
+        <div class="tier-pill" id="tp-100">100% · variable completo</div>
+        <div class="tier-pill" id="tp-110">110%+ · overperformance</div>
+      </div>
+
+      <div class="compare-row">
+        <div class="compare-box">
+          <div class="compare-title" style="color:var(--muted)">Sin multiplicador (base)</div>
+          <div class="compare-num" id="c-old-pct" style="color:var(--mid)">75%</div>
+          <div class="compare-sub" id="c-old-tier" style="color:var(--muted)">Tier 70% del variable</div>
+        </div>
+        <div class="compare-box highlight-teal" id="c-new-box">
+          <div class="compare-title" id="c-new-title" style="color:var(--teal)">Con modelo propuesto</div>
+          <div class="compare-num" id="c-new-pct" style="color:var(--teal)">85%</div>
+          <div class="compare-sub" id="c-new-tier" style="color:var(--teal)">Tier 80% del variable</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ESCENARIOS RÁPIDOS -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Escenarios rápidos</span>
+      <span class="badge badge-teal">Haz clic para simular</span>
+    </div>
+    <div class="card-body" style="padding-top:12px">
+      <div class="scenarios-header">
+        <span>Perfil</span>
+        <span>Sem. 1–2</span>
+        <span>Sem. 3–4</span>
+        <span class="s-hide">% meta</span>
+        <span class="s-hide">Ganancia</span>
+      </div>
+      <div class="scenarios" id="scenarios"></div>
+    </div>
+  </div>
+
+  <div class="footer">Simulador construido para el <strong>Business Case · Hunting Lead Junior</strong> · Los valores en azul son editables</div>
+
+</div>
+
+<script>
+  let condActive = true;
+
+  const escenarios = [
+    { name: "Hunter que arranca fuerte",        sub: "Cierra la mayoría en las primeras 2 semanas", early: 14, late: 3,  cond: true },
+    { name: "Hunter equilibrado",               sub: "Distribuye cierres a lo largo del mes",        early: 10, late: 10, cond: true },
+    { name: "Hunter con cierre tardío",         sub: "La mayoría de cierres en última quincena",     early: 3,  late: 17, cond: true },
+    { name: "Sin multiplicador · arranca fuerte", sub: "No cumplió 90% el mes anterior",             early: 14, late: 3,  cond: false },
+    { name: "Sin multiplicador · equilibrado",  sub: "No cumplió 90% el mes anterior",               early: 10, late: 10, cond: false },
+    { name: "Overperformance temprana",         sub: "Supera la meta cerrando early",                early: 18, late: 6,  cond: true },
+  ];
+
+  function tierInfo(pct) {
+    if (pct >= 1.1)  return { label: "110%+ · overperformance", color: "var(--purple)", pill: "tp-110", pillClass: "active-purple" };
+    if (pct >= 1.0)  return { label: "100% · meta completa",    color: "var(--teal)",   pill: "tp-100", pillClass: "active-teal" };
+    if (pct >= 0.9)  return { label: "90% · casi",              color: "var(--teal)",   pill: "tp-90",  pillClass: "active-teal" };
+    if (pct >= 0.8)  return { label: "80% · buen avance",       color: "var(--orange)", pill: "tp-80",  pillClass: "active-orange" };
+    return                  { label: "Bajo 80%",                 color: "var(--red)",    pill: "tp-0",   pillClass: "active-red" };
+  }
+
+  function tierMult(pct) {
+    if (pct >= 1.1) return 1.1;
+    if (pct >= 1.0) return 1.0;
+    if (pct >= 0.9) return 0.9;
+    if (pct >= 0.8) return 0.8;
+    return 0;
+  }
+
+  function tierLabel(pct) {
+    if (pct >= 1.1) return "110% del variable";
+    if (pct >= 1.0) return "100% del variable";
+    if (pct >= 0.9) return "90% del variable";
+    if (pct >= 0.8) return "80% del variable";
+    return "Sin variable";
+  }
+
+  function calc() {
+    const e    = parseInt(document.getElementById('sl-early').value);
+    const l    = parseInt(document.getElementById('sl-late').value);
+    const meta = parseInt(document.getElementById('sl-meta').value);
+    const mult = condActive ? 1.25 : 1.0;
+
+    ['v-early','sv-early'].forEach(id => document.getElementById(id).textContent = e);
+    ['v-late', 'sv-late' ].forEach(id => document.getElementById(id).textContent = l);
+    ['v-meta', 'sv-meta' ].forEach(id => document.getElementById(id).textContent = meta);
+    document.getElementById('label-meta').textContent = meta + ' tiendas';
+
+    const real     = e + l;
+    const credited = Math.round((e * mult + l) * 10) / 10;
+    const pctNew   = credited / meta;
+    const pctOld   = real / meta;
+
+    document.getElementById('r-real').textContent    = real;
+    document.getElementById('r-credit').textContent  = credited;
+    document.getElementById('r-credit').style.color  = condActive && credited > real ? 'var(--orange)' : 'var(--mid)';
+    document.getElementById('r-credit-sub').textContent = condActive ? 'con multiplicador ×1.25' : 'sin multiplicador';
+    document.getElementById('r-pct').textContent     = Math.round(pctNew * 100) + '%';
+
+    const ti = tierInfo(pctNew);
+    document.getElementById('r-tier-desc').textContent = ti.label;
+
+    const fill = document.getElementById('progress-fill');
+    fill.style.width      = Math.min(pctNew * 100, 115) + '%';
+    fill.style.background = ti.color;
+
+    ['tp-0','tp-80','tp-90','tp-100','tp-110'].forEach(id => {
+      document.getElementById(id).className = 'tier-pill';
+    });
+    document.getElementById(ti.pill).className = 'tier-pill ' + ti.pillClass;
+
+    const oldTierM = tierMult(pctOld);
+    const newTierM = tierMult(pctNew);
+
+    document.getElementById('c-old-pct').textContent  = Math.round(pctOld * 100) + '%';
+    document.getElementById('c-old-tier').textContent = tierLabel(pctOld);
+    document.getElementById('c-new-pct').textContent  = Math.round(pctNew * 100) + '%';
+    document.getElementById('c-new-tier').textContent = tierLabel(pctNew);
+    document.getElementById('c-new-pct').style.color  = condActive ? 'var(--teal)' : 'var(--red)';
+    document.getElementById('c-new-tier').style.color = condActive ? 'var(--teal)' : 'var(--red)';
+    document.getElementById('c-new-title').style.color = condActive ? 'var(--teal)' : 'var(--red)';
+    document.getElementById('c-new-title').textContent = condActive ? 'Con modelo propuesto' : 'Con modelo propuesto (bloqueado)';
+
+    const nb = document.getElementById('c-new-box');
+    nb.className = 'compare-box ' + (condActive ? 'highlight-teal' : 'highlight-red');
+  }
+
+  function toggleCond() {
+    condActive = !condActive;
+    const t = document.getElementById('toggle');
+    t.className = 'toggle-track' + (condActive ? ' on' : '');
+    document.getElementById('toggle-sub').textContent = condActive
+      ? 'Sí — multiplicador activo para semanas 1–2'
+      : 'No — multiplicador bloqueado este mes';
+    document.getElementById('lock-banner').className = 'lock-banner' + (condActive ? '' : ' show');
+    const et = document.getElementById('early-tag');
+    et.className = 'slider-tag early' + (condActive ? '' : ' locked');
+    et.textContent = condActive ? 'Sem. 1–2 · ×1.25' : 'Sem. 1–2 · ×1.0 (bloqueado)';
+    calc();
+  }
+
+  function loadScenario(idx) {
+    const s = escenarios[idx];
+    document.getElementById('sl-early').value = s.early;
+    document.getElementById('sl-late').value  = s.late;
+    if (condActive !== s.cond) toggleCond();
+    else calc();
+
+    document.querySelectorAll('.scenario-row').forEach((r, i) => {
+      r.className = 'scenario-row' + (i === idx ? ' selected' : '');
+    });
+  }
+
+  function buildScenarios() {
+    const meta = 20;
+    const container = document.getElementById('scenarios');
+    container.innerHTML = '';
+    escenarios.forEach((s, idx) => {
+      const mult      = s.cond ? 1.25 : 1.0;
+      const credited  = Math.round((s.early * mult + s.late) * 10) / 10;
+      const pctNew    = credited / meta;
+      const pctOld    = (s.early + s.late) / meta;
+      const gain      = Math.round((tierMult(pctNew) - tierMult(pctOld)) * 1000000);
+      const gainText  = gain > 0 ? '+$' + gain.toLocaleString('es-CO') : gain === 0 ? '—' : '-$' + Math.abs(gain).toLocaleString('es-CO');
+      const gainColor = gain > 0 ? 'var(--teal)' : gain === 0 ? 'var(--muted)' : 'var(--red)';
+      const pctColor  = pctNew >= 1 ? 'var(--teal)' : pctNew >= 0.8 ? 'var(--orange)' : 'var(--red)';
+
+      const row = document.createElement('div');
+      row.className = 'scenario-row';
+      row.innerHTML = `
+        <div>
+          <div class="scenario-name">${s.name}</div>
+          <div class="scenario-sub">${s.sub}</div>
+        </div>
+        <div class="scenario-val">${s.early}</div>
+        <div class="scenario-val">${s.late}</div>
+        <div class="scenario-pct s-hide" style="color:${pctColor}">${Math.round(pctNew*100)}%</div>
+        <div class="scenario-pct s-hide" style="color:${gainColor}">${gainText}</div>
+      `;
+      row.onclick = () => loadScenario(idx);
+      container.appendChild(row);
+    });
+  }
+
+  buildScenarios();
+  calc();
+</script>
+</body>
+</html>
